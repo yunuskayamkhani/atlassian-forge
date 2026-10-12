@@ -1,0 +1,13 @@
+node_modules/
+dist/
+build/
+*.log
+.idea/
+.DS_Store
+Thumbs.db
+/.forge/
+.container-service-assets/
+.env
+.env.*
+*.pem
+credentials.json
