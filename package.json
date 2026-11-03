@@ -1,0 +1,27 @@
+{
+  "name": "bitbucket-engineering-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "lint": "eslint src static/dashboard/src --ext .ts,.tsx",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "vitest run --config vitest.config.ts",
+    "test:frontend": "npm test --prefix static/dashboard",
+    "build": "npm run build --prefix static/dashboard",
+    "dev:ui": "npm run dev --prefix static/dashboard -- --port 3000 --host 127.0.0.1",
+    "install:all": "npm install && npm install --prefix static/dashboard"
+  },
+  "dependencies": {
+    "@forge/api": "^8.0.5",
+    "@forge/kvs": "^2.0.5",
+    "@forge/resolver": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "@typescript-eslint/parser": "^8.40.0",
+    "eslint": "^8.57.1",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
