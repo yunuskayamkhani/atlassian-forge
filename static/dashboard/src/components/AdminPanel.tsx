@@ -20,7 +20,7 @@ export function AdminPanel({
     <section className="connect-card" aria-labelledby="admins-title">
       <h2 id="admins-title">Dashboard admins</h2>
       <p>
-        People you add here get full access: connect Bitbucket, map projects, and choose boards and sprints.
+        People you add here get full access: connect Bitbucket, map projects, and choose destination branches.
         Everyone else only sees the dashboard for mappings they are allowed to view.
       </p>
       {admins.length === 0 ? (

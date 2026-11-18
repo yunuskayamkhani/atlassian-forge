@@ -12,7 +12,7 @@ import { EmptyState } from './EmptyState';
 import { AdminPanel } from './AdminPanel';
 import { MappingPanel } from './MappingPanel';
 import type { DataSourceStatus } from '../types/status';
-import type { AppUser, JiraProject, ProjectMapping, Repository, Workspace } from '../types/models';
+import type { AppUser, JiraProject, ProjectMapping, Repository, Result, Workspace } from '../types/models';
 
 export function Dashboard({
   isAdmin,
@@ -33,7 +33,8 @@ export function Dashboard({
   onSaveMapping,
   onSaveAdmins,
   onDeleteMapping,
-  onLoadRepositories
+  onLoadRepositories,
+  onLoadTargetBranches
 }: {
   isAdmin: boolean;
   currentAccountId: string;
@@ -54,22 +55,23 @@ export function Dashboard({
   onSaveAdmins: (admins: AppUser[]) => Promise<boolean>;
   onDeleteMapping: (id: string) => Promise<void>;
   onLoadRepositories: (workspaceId: string) => Promise<Repository[]>;
+  onLoadTargetBranches: (workspaceId: string, repositoryIds: string[]) => Promise<Result<string[]>>;
 }) {
   const { pullRequests, commits } = useDashboardData();
 
   const toSourceState = (
-    status: 'idle' | 'needs-repo' | 'loading' | 'loaded' | 'error'
+    status: 'idle' | 'needs-repo' | 'loading' | 'loaded' | 'partial' | 'error'
   ): DataSourceStatus['state'] => {
     if (status === 'loaded') {
       return 'loaded';
     }
-    if (status === 'error') {
+    if (status === 'error' || status === 'partial') {
       return 'unavailable';
     }
     return 'pending';
   };
 
-  const prsLoaded = pullRequests.status === 'loaded';
+  const prsLoaded = pullRequests.status === 'loaded' || pullRequests.status === 'partial';
   const commitsLoaded = commits.status === 'loaded';
   const activeMapping = mappings.find(
     (mapping) =>
@@ -124,6 +126,7 @@ export function Dashboard({
             jiraProjects={jiraProjects}
             workspaces={workspaces}
             onLoadRepositories={onLoadRepositories}
+            onLoadTargetBranches={onLoadTargetBranches}
             onSave={onSaveMapping}
             onDelete={onDeleteMapping}
           />

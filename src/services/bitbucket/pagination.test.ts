@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { collectPages, parsePage } from './pagination';
+import { collectPages, mapInBatches, parsePage } from './pagination';
 import { BitbucketApiError } from './errors';
 
 describe('parsePage', () => {
@@ -64,5 +64,28 @@ describe('collectPages', () => {
     });
 
     expect(items).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe('mapInBatches', () => {
+  it('limits concurrent requests to the configured batch size and preserves order', async () => {
+    let active = 0;
+    let maxActive = 0;
+    const result = await mapInBatches([1, 2, 3, 4, 5], 2, async (value) => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      await Promise.resolve();
+      active -= 1;
+      return value * 2;
+    });
+
+    expect(result).toEqual([2, 4, 6, 8, 10]);
+    expect(maxActive).toBeLessThanOrEqual(2);
+  });
+
+  it('rejects invalid batch sizes', async () => {
+    await expect(mapInBatches([1], 0, async (value) => value)).rejects.toThrow(
+      'Batch size must be a positive integer.'
+    );
   });
 });

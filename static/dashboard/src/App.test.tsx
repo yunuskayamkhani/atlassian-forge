@@ -47,6 +47,7 @@ const mapping = {
   boardName: '',
   sprintId: '',
   sprintName: '',
+  targetBranch: '',
   viewers: [{ accountId: 'test-account', displayName: 'Test User' }]
 };
 

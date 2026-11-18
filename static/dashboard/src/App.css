@@ -373,6 +373,13 @@ td code {
   gap: 4px;
 }
 
+.jira-statuses {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
 .jira-key {
   background: #deebff;
   color: #0747a6;
@@ -386,12 +393,6 @@ td code {
 
 .jira-key:hover {
   background: #b3d4ff;
-}
-
-.jira-key-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
 }
 
 .jira-status {

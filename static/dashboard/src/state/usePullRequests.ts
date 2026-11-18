@@ -4,14 +4,25 @@ import { useFilters } from './FilterContext';
 import type { PullRequest } from '../types/models';
 
 export type PullRequestState = {
-  status: 'idle' | 'needs-repo' | 'loading' | 'loaded' | 'error';
+  status: 'idle' | 'needs-repo' | 'loading' | 'loaded' | 'partial' | 'error';
   pullRequests: PullRequest[];
   message: string | null;
   retryable: boolean;
   reload: () => void;
 };
 
-export function usePullRequests(): PullRequestState {
+function sortByPullRequestNumberDescending(pullRequests: PullRequest[]): PullRequest[] {
+  return [...pullRequests].sort((a, b) => {
+    const numberDifference = Number(b.id) - Number(a.id);
+    if (Number.isFinite(numberDifference) && numberDifference !== 0) {
+      return numberDifference;
+    }
+
+    return Date.parse(b.updatedOn || '') - Date.parse(a.updatedOn || '');
+  });
+}
+
+export function usePullRequests(mappedRepositoryIds: string[]): PullRequestState {
   const { filters } = useFilters();
   const [status, setStatus] = useState<PullRequestState['status']>('idle');
   const [pullRequests, setPullRequests] = useState<PullRequest[]>([]);
@@ -28,7 +39,11 @@ export function usePullRequests(): PullRequestState {
       return;
     }
 
-    if (repositoryId === 'ALL') {
+    const repositoryIds =
+      repositoryId === 'ALL'
+        ? Array.from(new Set(mappedRepositoryIds))
+        : [repositoryId];
+    if (repositoryIds.length === 0) {
       setStatus('needs-repo');
       setPullRequests([]);
       setMessage(null);
@@ -40,28 +55,43 @@ export function usePullRequests(): PullRequestState {
     setMessage(null);
 
     void (async () => {
-      const result = await fetchPullRequests(workspaceId, repositoryId, prStatus);
+      const results = await Promise.all(
+        repositoryIds.map((id) => fetchPullRequests(workspaceId, id, prStatus))
+      );
       if (cancelled) {
         return;
       }
 
-      if (!result.ok) {
-        setPullRequests([]);
-        setStatus('error');
-        setMessage(result.message);
-        setRetryable(result.retryable);
+      const failure = results.find((result) => !result.ok);
+      const successfulResults = results.filter((result) => result.ok);
+      if (failure && !failure.ok) {
+        if (successfulResults.length === 0) {
+          setPullRequests([]);
+          setStatus('error');
+          setMessage(failure.message);
+          setRetryable(failure.retryable);
+          return;
+        }
+
+        setPullRequests(sortByPullRequestNumberDescending(successfulResults.flatMap((result) => result.data)));
+        setStatus('partial');
+        setMessage(
+          `Some repositories could not be loaded: ${failure.message} Showing pull requests from repositories that were accessible.`
+        );
+        setRetryable(results.some((result) => !result.ok && result.retryable));
         return;
       }
 
-      setPullRequests(result.data);
+      setPullRequests(sortByPullRequestNumberDescending(successfulResults.flatMap((result) => result.data)));
       setStatus('loaded');
       setMessage(null);
+      setRetryable(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, repositoryId, prStatus, nonce]);
+  }, [workspaceId, repositoryId, mappedRepositoryIds, prStatus, nonce]);
 
   return {
     status,

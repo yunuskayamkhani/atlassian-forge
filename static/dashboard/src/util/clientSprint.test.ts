@@ -16,23 +16,18 @@ const mapping: ProjectMapping = {
   boardName: '',
   sprintId: '',
   sprintName: '',
+  targetBranch: '',
   viewers: []
 };
 
 describe('clientSprintLabel', () => {
-  it('hides the label when all activity is visible', () => {
+  it('hides the label when all destination branches are visible', () => {
     expect(clientSprintLabel(mapping)).toBeNull();
   });
 
-  it('describes the active sprint', () => {
-    expect(clientSprintLabel({ ...mapping, sprintMode: 'active', sprintName: 'Sprint 12' })).toBe(
-      'Showing sprint: Sprint 12 (active)'
-    );
-  });
-
-  it('describes a specifically selected sprint', () => {
-    expect(clientSprintLabel({ ...mapping, sprintMode: 'selected', sprintName: 'Sprint 11' })).toBe(
-      'Showing sprint: Sprint 11'
+  it('describes the selected Bitbucket destination branch', () => {
+    expect(clientSprintLabel({ ...mapping, targetBranch: 'Sprint-67/Development_Sprint-67' })).toBe(
+      'Showing destination branch: Sprint-67/Development_Sprint-67'
     );
   });
 });

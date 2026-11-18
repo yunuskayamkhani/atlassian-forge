@@ -1,6 +1,7 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { usePullRequests, type PullRequestState } from './usePullRequests';
 import { useCommits, type CommitsState } from './useCommits';
+import type { Repository } from '../types/models';
 
 type DashboardData = {
   pullRequests: PullRequestState;
@@ -9,9 +10,16 @@ type DashboardData = {
 
 const DashboardDataContext = createContext<DashboardData | null>(null);
 
-export function DashboardDataProvider({ children }: { children: ReactNode }) {
-  const pullRequests = usePullRequests();
-  const commits = useCommits();
+export function DashboardDataProvider({
+  children,
+  repositories
+}: {
+  children: ReactNode;
+  repositories: Repository[];
+}) {
+  const repositoryIds = useMemo(() => repositories.map((repository) => repository.id), [repositories]);
+  const pullRequests = usePullRequests(repositoryIds);
+  const commits = useCommits(repositoryIds);
 
   return (
     <DashboardDataContext.Provider value={{ pullRequests, commits }}>

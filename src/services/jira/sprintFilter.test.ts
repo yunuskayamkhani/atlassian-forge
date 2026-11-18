@@ -21,7 +21,8 @@ const mapping: ProjectMapping = {
   boardId: '1',
   boardName: 'SCRUM board',
   sprintId: '12',
-  sprintName: 'Sprint 12'
+  sprintName: 'Sprint 12',
+  viewers: []
 };
 
 describe('filterForClientSprint', () => {
@@ -50,6 +51,6 @@ describe('sprint key helpers', () => {
   });
 
   it('extracts keys from a commit message', () => {
-    expect(commitSprintKeys({ message: 'SCRUM-9 fix cache' } as never)).toEqual(['SCRUM-9']);
+    expect(commitSprintKeys({ jiraKeys: ['SCRUM-9'] } as never)).toEqual(['SCRUM-9']);
   });
 });

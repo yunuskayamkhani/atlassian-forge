@@ -1,7 +1,7 @@
 import type { Commit } from '../../models/commit';
 import type { ProjectMapping } from '../../models/projectMapping';
 import type { PullRequest } from '../../models/pullRequest';
-import { extractJiraKeys, itemMatchesSprint } from './keys';
+import { itemMatchesSprint } from './keys';
 import { resolveClientSprint } from './sprints';
 
 export async function filterForClientSprint<T>(
@@ -21,5 +21,5 @@ export function pullRequestSprintKeys(pr: PullRequest): string[] {
 }
 
 export function commitSprintKeys(commit: Commit): string[] {
-  return extractJiraKeys(commit.message);
+  return commit.jiraKeys;
 }

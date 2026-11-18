@@ -53,6 +53,7 @@ export function parseMapping(raw: unknown): ProjectMapping | null {
     boardName: typeof record.boardName === 'string' ? record.boardName : '',
     sprintId: typeof record.sprintId === 'string' ? record.sprintId : '',
     sprintName: typeof record.sprintName === 'string' ? record.sprintName : '',
+    targetBranch: typeof record.targetBranch === 'string' ? record.targetBranch : '',
     viewers: parseUserList(record.viewers)
   };
 }
@@ -72,13 +73,15 @@ export function parseSaveMapping(payload: unknown): ProjectMapping {
   if (mapping.viewers.length === 0) {
     throw new BitbucketApiError('Add at least one viewer to grant Bitbucket data access.', 400, false);
   }
-  if (mapping.sprintMode === 'active' && !mapping.boardId) {
-    throw new BitbucketApiError('Select a Jira board to use the active sprint.', 400, false);
-  }
-  if (mapping.sprintMode === 'selected' && !mapping.sprintId) {
-    throw new BitbucketApiError('Select the sprint the client should see.', 400, false);
-  }
-  return { ...mapping, id: mapping.projectId };
+  return {
+    ...mapping,
+    id: mapping.projectId,
+    sprintMode: 'none',
+    boardId: '',
+    boardName: '',
+    sprintId: '',
+    sprintName: ''
+  };
 }
 
 function canViewMapping(mapping: ProjectMapping, accountId: string): boolean {

@@ -3,6 +3,7 @@ import { createForgeClient, type BitbucketClient } from './client';
 import { assertRepositoryId, assertWorkspaceId } from './identifiers';
 import { BitbucketApiError } from './errors';
 import { collectPages, parsePage } from './pagination';
+import { extractJiraKeys } from '../jira/keys';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : null;
@@ -55,12 +56,14 @@ export function normalizeCommit(raw: unknown): Commit | null {
     return null;
   }
 
-  const message = typeof record.message === 'string' ? firstLine(record.message) : '';
+  const fullMessage = typeof record.message === 'string' ? record.message : '';
+  const message = firstLine(fullMessage);
 
   return {
     hash,
     shortHash: hash.slice(0, 7),
     message,
+    jiraKeys: extractJiraKeys(fullMessage),
     author: commitAuthor(record.author),
     date: typeof record.date === 'string' ? record.date : '',
     webUrl: htmlHref(record.links)
@@ -84,14 +87,51 @@ export async function listCommits(
   });
 }
 
-export function assertCommitQuery(payload: unknown): { workspaceId: string; repositoryId: string } {
+export async function listPullRequestCommits(
+  workspaceId: string,
+  repositoryId: string,
+  pullRequestId: string,
+  client?: BitbucketClient
+): Promise<Commit[]> {
+  const ws = assertWorkspaceId(workspaceId);
+  const repo = assertRepositoryId(repositoryId);
+  if (!/^\d+$/.test(pullRequestId)) {
+    throw new BitbucketApiError('Select a valid pull request.', 400, false);
+  }
+  const bb = client ?? (await createForgeClient());
+  const base = `/2.0/repositories/${encodeURIComponent(ws)}/${encodeURIComponent(
+    repo
+  )}/pullrequests/${encodeURIComponent(pullRequestId)}/commits?pagelen=50`;
+
+  return collectPages({
+    fetchFirst: async () => parsePage(await bb.getRelative(base), normalizeCommit),
+    fetchNext: async (nextUrl) => parsePage(await bb.getAbsolute(nextUrl), normalizeCommit)
+  });
+}
+
+export function assertCommitQuery(payload: unknown): {
+  workspaceId: string;
+  repositoryId: string;
+  prStatus?: string;
+  dateFrom: number | null;
+} {
   const record = asRecord(payload);
   if (!record) {
     throw new BitbucketApiError('Select a workspace and repository.', 400, false);
   }
 
+  const dateFrom = record.dateFrom === null || record.dateFrom === undefined ? null : record.dateFrom;
+  if (
+    dateFrom !== null &&
+    (typeof dateFrom !== 'number' || !Number.isFinite(dateFrom))
+  ) {
+    throw new BitbucketApiError('Select a valid commit date range.', 400, false);
+  }
+
   return {
     workspaceId: record.workspaceId as string,
-    repositoryId: record.repositoryId as string
+    repositoryId: record.repositoryId as string,
+    prStatus: typeof record.prStatus === 'string' ? record.prStatus : undefined,
+    dateFrom
   };
 }

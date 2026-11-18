@@ -1,5 +1,5 @@
 import { invokeResult } from './invokeResult';
-import type { AccessContext, AppUser, JiraBoard, JiraSprint, ProjectMapping, Result } from '../types/models';
+import type { AccessContext, AppUser, ProjectMapping, Result } from '../types/models';
 
 export function fetchAccessContext(): Promise<Result<AccessContext>> {
   return invokeResult<AccessContext>('getAccessContext');
@@ -15,12 +15,11 @@ export function deleteProjectMapping(id: string): Promise<Result<ProjectMapping[
   return invokeResult<ProjectMapping[]>('deleteProjectMapping', { id });
 }
 
-export function fetchBoards(projectKey: string): Promise<Result<JiraBoard[]>> {
-  return invokeResult<JiraBoard[]>('getBoards', { projectKey });
-}
-
-export function fetchSprints(boardId: string): Promise<Result<JiraSprint[]>> {
-  return invokeResult<JiraSprint[]>('getSprints', { boardId });
+export function fetchPullRequestTargetBranches(
+  workspaceId: string,
+  repositoryIds: string[]
+): Promise<Result<string[]>> {
+  return invokeResult<string[]>('getPullRequestTargetBranches', { workspaceId, repositoryIds });
 }
 
 export function searchUsers(query: string): Promise<Result<AppUser[]>> {

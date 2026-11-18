@@ -5,7 +5,7 @@ import { deleteProjectMapping, getAccessContext, saveDashboardAdmins, saveProjec
 import { searchUsers } from './resolvers/users';
 import { getWorkspaces } from './resolvers/workspaces';
 import { getRepositories, getRepositoryDetails } from './resolvers/repositories';
-import { getPullRequests } from './resolvers/pullRequests';
+import { getPullRequestTargetBranches, getPullRequests } from './resolvers/pullRequests';
 import { getCommits } from './resolvers/commits';
 import { getIssueStatuses } from './resolvers/jiraIssues';
 import { getBoards, getSprints } from './resolvers/sprints';
@@ -25,6 +25,7 @@ resolver.define('getWorkspaces', () => getWorkspaces());
 resolver.define('getRepositories', (req) => getRepositories(req.payload));
 resolver.define('getRepository', (req) => getRepositoryDetails(req.payload));
 resolver.define('getPullRequests', (req) => getPullRequests(req.payload));
+resolver.define('getPullRequestTargetBranches', (req) => getPullRequestTargetBranches(req.payload));
 resolver.define('getCommits', (req) => getCommits(req.payload));
 resolver.define('getIssueStatuses', (req) => getIssueStatuses(req.payload));
 resolver.define('getBoards', (req) => getBoards(req.payload));

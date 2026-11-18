@@ -54,3 +54,20 @@ export async function collectPages<T>(options: {
     pages += 1;
   }
 }
+
+export async function mapInBatches<T, R>(
+  items: T[],
+  batchSize: number,
+  mapItem: (item: T) => Promise<R>
+): Promise<R[]> {
+  if (!Number.isInteger(batchSize) || batchSize < 1) {
+    throw new BitbucketApiError('Batch size must be a positive integer.', 400, false);
+  }
+
+  const results: R[] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize);
+    results.push(...(await Promise.all(batch.map(mapItem))));
+  }
+  return results;
+}

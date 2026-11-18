@@ -10,6 +10,8 @@ export type PullRequest = {
   createdOn: string;
   updatedOn: string;
   webUrl: string;
+  declinedBy: string;
   reviewers: string[];
+  approvedReviewers: string[];
   jiraKeys: string[];
 };

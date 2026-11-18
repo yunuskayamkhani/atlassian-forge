@@ -4,7 +4,15 @@ import { DEFAULT_FILTERS } from '../types/filters';
 import type { Commit } from '../types/models';
 
 function commit(date: string, author: string): Commit {
-  return { hash: date + author, shortHash: 'abc1234', message: 'x', author, date, webUrl: '' };
+  return {
+    hash: date + author,
+    shortHash: 'abc1234',
+    message: 'x',
+    jiraKeys: [],
+    author,
+    date,
+    webUrl: ''
+  };
 }
 
 const commits: Commit[] = [

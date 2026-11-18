@@ -13,7 +13,7 @@ export type CommitsState = {
   reload: () => void;
 };
 
-export function useCommits(): CommitsState {
+export function useCommits(mappedRepositoryIds: string[]): CommitsState {
   const { filters } = useFilters();
   const [status, setStatus] = useState<CommitsState['status']>('idle');
   const [commits, setCommits] = useState<Commit[]>([]);
@@ -21,7 +21,11 @@ export function useCommits(): CommitsState {
   const [retryable, setRetryable] = useState(false);
   const [nonce, setNonce] = useState(0);
 
-  const { workspaceId, repositoryId } = filters;
+  const { workspaceId, repositoryId, prStatus } = filters;
+  const window = useMemo(
+    () => dateWindow(filters),
+    [filters.dateRange, filters.customFrom, filters.customTo]
+  );
 
   useEffect(() => {
     if (!workspaceId) {
@@ -30,7 +34,11 @@ export function useCommits(): CommitsState {
       return;
     }
 
-    if (repositoryId === 'ALL') {
+    const repositoryIds =
+      repositoryId === 'ALL'
+        ? Array.from(new Set(mappedRepositoryIds))
+        : [repositoryId];
+    if (repositoryIds.length === 0) {
       setStatus('needs-repo');
       setCommits([]);
       setMessage(null);
@@ -42,20 +50,24 @@ export function useCommits(): CommitsState {
     setMessage(null);
 
     void (async () => {
-      const result = await fetchCommits(workspaceId, repositoryId);
+      const results = [];
+      for (const id of repositoryIds) {
+        results.push(await fetchCommits(workspaceId, id, prStatus, window.from));
+      }
       if (cancelled) {
         return;
       }
 
-      if (!result.ok) {
+      const failure = results.find((result) => !result.ok);
+      if (failure && !failure.ok) {
         setCommits([]);
         setStatus('error');
-        setMessage(result.message);
-        setRetryable(result.retryable);
+        setMessage(failure.message);
+        setRetryable(failure.retryable);
         return;
       }
 
-      setCommits(result.data);
+      setCommits(results.flatMap((result) => (result.ok ? result.data : [])));
       setStatus('loaded');
       setMessage(null);
     })();
@@ -63,7 +75,7 @@ export function useCommits(): CommitsState {
     return () => {
       cancelled = true;
     };
-  }, [workspaceId, repositoryId, nonce]);
+  }, [workspaceId, repositoryId, mappedRepositoryIds, prStatus, window.from, window.to, nonce]);
 
   const filtered = useMemo(
     () => filterByWindow(commits, dateWindow(filters)),

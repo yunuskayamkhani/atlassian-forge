@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { deleteProjectMapping, fetchAccessContext, saveDashboardAdmins, saveProjectMapping } from '../api/access';
+import {
+  deleteProjectMapping,
+  fetchAccessContext,
+  fetchPullRequestTargetBranches,
+  saveDashboardAdmins,
+  saveProjectMapping
+} from '../api/access';
 import { removeBitbucketConnection, saveBitbucketConnection } from '../api/connection';
 import { fetchRepositories } from '../api/repositories';
 import { fetchWorkspaces } from '../api/workspaces';
@@ -29,6 +35,9 @@ export type DiscoveryState = {
   saveAdmins: (admins: AppUser[]) => Promise<boolean>;
   removeMapping: (id: string) => Promise<void>;
   loadAdminRepositories: (workspaceId: string) => Promise<Repository[]>;
+  loadPullRequestTargetBranches: (workspaceId: string, repositoryIds: string[]) => ReturnType<
+    typeof fetchPullRequestTargetBranches
+  >;
 };
 
 function reposForMapping(mapping: ProjectMapping | undefined): Repository[] {
@@ -69,7 +78,7 @@ export function useDiscovery(currentProjectKey: string): DiscoveryState {
     [currentAccountId, mappings]
   );
   const selectedMapping = enabledMappings.find((mapping) => mapping.projectId === filters.projectId);
-  const repositories = reposForMapping(selectedMapping);
+  const repositories = useMemo(() => reposForMapping(selectedMapping), [selectedMapping]);
   const repositoryStatus: DataSourceStatus['state'] = selectedMapping ? 'loaded' : 'pending';
 
   const applyMappings = useCallback(
@@ -230,6 +239,12 @@ export function useDiscovery(currentProjectKey: string): DiscoveryState {
     return result.data;
   }, []);
 
+  const loadPullRequestBranches = useCallback(
+    (workspaceId: string, repositoryIds: string[]) =>
+      fetchPullRequestTargetBranches(workspaceId, repositoryIds),
+    []
+  );
+
   useEffect(() => {
     if (currentProjectKey && loadedProjectKey.current !== currentProjectKey) {
       loadedProjectKey.current = currentProjectKey;
@@ -258,6 +273,7 @@ export function useDiscovery(currentProjectKey: string): DiscoveryState {
     saveMapping,
     saveAdmins,
     removeMapping,
-    loadAdminRepositories
+    loadAdminRepositories,
+    loadPullRequestTargetBranches: loadPullRequestBranches
   };
 }

@@ -60,27 +60,30 @@ function Shell() {
   }
 
   return (
-    <Dashboard
-      isAdmin={discovery.isAdmin}
-      currentAccountId={discovery.currentAccountId}
-      currentProjectKey={projectContext.projectKey ?? ''}
-      admins={discovery.admins}
-      mappings={discovery.mappings}
-      jiraProjects={discovery.jiraProjects}
-      workspaces={discovery.workspaces}
-      repositories={discovery.repositories}
-      lastUpdated={discovery.lastUpdated}
-      isRefreshing={discovery.isRefreshing}
-      errorMessage={discovery.errorMessage}
-      retryable={discovery.retryable}
-      repositoryStatus={discovery.repositoryStatus}
-      onRefresh={() => void discovery.load()}
-      onDisconnect={() => void discovery.disconnect()}
-      onSaveMapping={discovery.saveMapping}
-      onSaveAdmins={discovery.saveAdmins}
-      onDeleteMapping={discovery.removeMapping}
-      onLoadRepositories={discovery.loadAdminRepositories}
-    />
+    <DashboardDataProvider repositories={discovery.repositories}>
+      <Dashboard
+        isAdmin={discovery.isAdmin}
+        currentAccountId={discovery.currentAccountId}
+        currentProjectKey={projectContext.projectKey ?? ''}
+        admins={discovery.admins}
+        mappings={discovery.mappings}
+        jiraProjects={discovery.jiraProjects}
+        workspaces={discovery.workspaces}
+        repositories={discovery.repositories}
+        lastUpdated={discovery.lastUpdated}
+        isRefreshing={discovery.isRefreshing}
+        errorMessage={discovery.errorMessage}
+        retryable={discovery.retryable}
+        repositoryStatus={discovery.repositoryStatus}
+        onRefresh={() => void discovery.load()}
+        onDisconnect={() => void discovery.disconnect()}
+        onSaveMapping={discovery.saveMapping}
+        onSaveAdmins={discovery.saveAdmins}
+        onDeleteMapping={discovery.removeMapping}
+        onLoadRepositories={discovery.loadAdminRepositories}
+        onLoadTargetBranches={discovery.loadPullRequestTargetBranches}
+      />
+    </DashboardDataProvider>
   );
 }
 
@@ -88,9 +91,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <FilterProvider>
-        <DashboardDataProvider>
-          <Shell />
-        </DashboardDataProvider>
+        <Shell />
       </FilterProvider>
     </ErrorBoundary>
   );

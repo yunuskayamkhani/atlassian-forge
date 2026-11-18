@@ -2,7 +2,7 @@ import type { PullRequest, PullRequestState } from '../../models/pullRequest';
 import { createForgeClient, type BitbucketClient } from './client';
 import { assertRepositoryId, assertWorkspaceId } from './identifiers';
 import { BitbucketApiError } from './errors';
-import { collectPages, parsePage } from './pagination';
+import { collectPages, mapInBatches, parsePage } from './pagination';
 
 import { extractJiraKeys } from '../jira/keys';
 
@@ -25,17 +25,53 @@ function personName(value: unknown): string {
   if (!record) {
     return '';
   }
-  if (typeof record.display_name === 'string') {
-    return record.display_name;
-  }
-  return typeof record.nickname === 'string' ? record.nickname : '';
+  const candidates = [record.display_name, record.nickname, record.username, record.name, record.account_id];
+  return candidates.find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)?.trim() ?? '';
 }
 
-function reviewerNames(value: unknown): string[] {
+function reviewerNames(value: unknown, participants: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return reviewerParticipantNames(participants);
+  }
+  const names = value
+    .map((reviewer) => {
+      const record = asRecord(reviewer);
+      return personName(record?.user ?? reviewer);
+    })
+    .filter((name): name is string => name.length > 0);
+  return names.length > 0 ? names : reviewerParticipantNames(participants);
+}
+
+function reviewerParticipantNames(value: unknown): string[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.map(personName).filter((name): name is string => name.length > 0);
+  return value
+    .filter((participant) => {
+      const record = asRecord(participant);
+      return record?.role === 'REVIEWER';
+    })
+    .map((participant) => {
+      const record = asRecord(participant);
+      return personName(record?.user);
+    })
+    .filter((name): name is string => name.length > 0);
+}
+
+function approvedReviewerNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter((participant) => {
+      const record = asRecord(participant);
+      return record?.role === 'REVIEWER' && record.approved === true;
+    })
+    .map((participant) => {
+      const record = asRecord(participant);
+      return personName(record?.user);
+    })
+    .filter((name): name is string => name.length > 0);
 }
 
 function htmlHref(links: unknown): string {
@@ -76,8 +112,14 @@ export function normalizePullRequest(raw: unknown): PullRequest | null {
     createdOn: typeof record.created_on === 'string' ? record.created_on : '',
     updatedOn: typeof record.updated_on === 'string' ? record.updated_on : '',
     webUrl: htmlHref(record.links),
-    reviewers: reviewerNames(record.reviewers),
-    jiraKeys: extractJiraKeys(title)
+    declinedBy: personName(record.closed_by),
+    reviewers: reviewerNames(record.reviewers, record.participants),
+    approvedReviewers: approvedReviewerNames(record.participants),
+    jiraKeys: extractJiraKeys(
+      [title, branchName(record.source), branchName(record.destination), record.description]
+        .filter((value): value is string => typeof value === 'string')
+        .join('\n')
+    )
   };
 }
 
@@ -88,26 +130,94 @@ export function statesForFilter(prStatus?: string): PullRequestState[] {
   return PR_STATES;
 }
 
+export function filterByDestinationBranch(
+  pullRequests: PullRequest[],
+  targetBranch: string
+): PullRequest[] {
+  return targetBranch ? pullRequests.filter((pullRequest) => pullRequest.targetBranch === targetBranch) : pullRequests;
+}
+
+export function filterByUpdatedSince(pullRequests: PullRequest[], from: number | null): PullRequest[] {
+  if (from === null) {
+    return pullRequests;
+  }
+
+  return pullRequests.filter((pullRequest) => {
+    const updatedAt = new Date(pullRequest.updatedOn).getTime();
+    return !Number.isNaN(updatedAt) && updatedAt >= from;
+  });
+}
+
 export async function listPullRequests(
   workspaceId: string,
   repositoryId: string,
   prStatus?: string,
-  client?: BitbucketClient
+  client?: BitbucketClient,
+  destinationBranch?: string,
+  includeReviewerDetails = false
 ): Promise<PullRequest[]> {
   const ws = assertWorkspaceId(workspaceId);
   const repo = assertRepositoryId(repositoryId);
   const bb = client ?? (await createForgeClient());
+  const reviewerDetailsNeeded = new Set<string>();
 
   const query = statesForFilter(prStatus)
     .map((state) => `state=${state}`)
     .join('&');
+  const branchQuery = destinationBranch
+    ? `&q=${encodeURIComponent(`destination.branch.name="${destinationBranch.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`)}`
+    : '';
   const base = `/2.0/repositories/${encodeURIComponent(ws)}/${encodeURIComponent(
     repo
-  )}/pullrequests?${query}&pagelen=50&sort=-updated_on`;
+  )}/pullrequests?${query}${branchQuery}&pagelen=50&sort=-updated_on`;
+  const parsePullRequestPage = (payload: unknown) =>
+    parsePage(payload, (raw) => {
+      const pullRequest = normalizePullRequest(raw);
+      const record = asRecord(raw);
+      if (includeReviewerDetails && pullRequest && record) {
+        const reviewers = record.reviewers;
+        const participants = record.participants;
+        const hasAssignedReviewers = Array.isArray(reviewers) && reviewers.length > 0;
+        const reviewerDataMissing = !Array.isArray(reviewers);
+        const approvalStateMissing =
+          !Array.isArray(participants) ||
+          !participants.some((participant) => typeof asRecord(participant)?.approved === 'boolean');
+        if (approvalStateMissing && (hasAssignedReviewers || reviewerDataMissing)) {
+          reviewerDetailsNeeded.add(pullRequest.id);
+        }
+      }
+      return pullRequest;
+    });
 
-  return collectPages({
-    fetchFirst: async () => parsePage(await bb.getRelative(base), normalizePullRequest),
-    fetchNext: async (nextUrl) => parsePage(await bb.getAbsolute(nextUrl), normalizePullRequest)
+  const pullRequests = await collectPages({
+    fetchFirst: async () => parsePullRequestPage(await bb.getRelative(base)),
+    fetchNext: async (nextUrl) => parsePullRequestPage(await bb.getAbsolute(nextUrl))
+  });
+  if (reviewerDetailsNeeded.size === 0) {
+    return pullRequests;
+  }
+
+  const reviewerDetails = await mapInBatches(Array.from(reviewerDetailsNeeded), 4, async (id) => {
+    const detailPath = `/2.0/repositories/${encodeURIComponent(ws)}/${encodeURIComponent(
+      repo
+    )}/pullrequests/${encodeURIComponent(id)}`;
+    const detail = normalizePullRequest(await bb.getRelative(detailPath));
+    if (!detail) {
+      throw new BitbucketApiError('Bitbucket returned a malformed pull request response.', 502, false);
+    }
+    return [id, { reviewers: detail.reviewers, approvedReviewers: detail.approvedReviewers }] as const;
+  });
+  const reviewersByPullRequest = new Map(reviewerDetails);
+
+  return pullRequests.map((pullRequest) => {
+    const details = reviewersByPullRequest.get(pullRequest.id);
+    return details
+      ? {
+          ...pullRequest,
+          reviewers: details.reviewers,
+          approvedReviewers: details.approvedReviewers
+        }
+      : pullRequest;
   });
 }
 

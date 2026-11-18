@@ -19,6 +19,7 @@ const mapping = {
   boardName: '',
   sprintId: '',
   sprintName: '',
+  targetBranch: '',
   viewers: []
 };
 
@@ -55,7 +56,7 @@ describe('Filters', () => {
     expect(screen.getByText(`Selected repository: ${repository.id}`)).toBeInTheDocument();
   });
 
-  it('shows which sprint the client can see', () => {
+  it('shows which destination branch the client can see', () => {
     render(
       <FilterProvider
         initialFilters={{ ...DEFAULT_FILTERS, projectId: mapping.projectId, workspaceId: mapping.workspaceId }}
@@ -64,12 +65,12 @@ describe('Filters', () => {
           lastUpdated="2026-09-10T10:00:00.000Z"
           isRefreshing={false}
           onRefresh={() => undefined}
-          mappings={[{ ...mapping, sprintMode: 'selected', sprintName: 'Sprint 12' }]}
+          mappings={[{ ...mapping, targetBranch: 'Sprint-67/Development_Sprint-67' }]}
           repositories={[repository]}
         />
       </FilterProvider>
     );
-    expect(screen.getByText('Showing sprint: Sprint 12')).toBeInTheDocument();
+    expect(screen.getByText('Showing destination branch: Sprint-67/Development_Sprint-67')).toBeInTheDocument();
   });
 
   it('disables repository selection until a project is chosen', () => {

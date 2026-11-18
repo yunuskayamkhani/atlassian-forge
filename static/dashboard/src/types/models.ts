@@ -58,6 +58,7 @@ export type ProjectMapping = {
   boardName: string;
   sprintId: string;
   sprintName: string;
+  targetBranch?: string;
   viewers: AppUser[];
 };
 
@@ -79,6 +80,7 @@ export type Commit = {
   hash: string;
   shortHash: string;
   message: string;
+  jiraKeys: string[];
   author: string;
   date: string;
   webUrl: string;
@@ -96,7 +98,9 @@ export type PullRequest = {
   createdOn: string;
   updatedOn: string;
   webUrl: string;
+  declinedBy: string;
   reviewers: string[];
+  approvedReviewers: string[];
   jiraKeys: string[];
 };
 

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { BitbucketClient } from './client';
-import { commitAuthor, firstLine, listCommits, normalizeCommit } from './commits';
+import {
+  commitAuthor,
+  firstLine,
+  listCommits,
+  listPullRequestCommits,
+  normalizeCommit
+} from './commits';
 
 const workspaceId = '{470c176d-3574-44ea-bb41-89e8638bcca4}';
 const repoId = '{11111111-1111-1111-1111-111111111111}';
@@ -39,6 +45,7 @@ describe('normalizeCommit', () => {
       hash: '0123456789abcdef0123456789abcdef01234567',
       shortHash: '0123456',
       message: 'PROJ-1 Add caching',
+      jiraKeys: ['PROJ-1'],
       author: 'Ada Lovelace',
       date: '2026-09-05T09:30:00Z',
       webUrl: 'https://bitbucket.org/acme/payments/commits/0123456'
@@ -47,6 +54,12 @@ describe('normalizeCommit', () => {
 
   it('skips commits without a hash', () => {
     expect(normalizeCommit({ message: 'x' })).toBeNull();
+  });
+
+  it('extracts sprint issue keys from the full commit message', () => {
+    expect(normalizeCommit({ ...rawCommit, message: 'Refactor caching\n\nFollow up PROJ-2' })?.jiraKeys).toEqual([
+      'PROJ-2'
+    ]);
   });
 });
 
@@ -66,5 +79,23 @@ describe('listCommits', () => {
     expect(commits).toHaveLength(1);
     expect(commits[0].shortHash).toBe('0123456');
     expect(requested[0]).toContain('/commits?pagelen=50');
+  });
+
+  describe('listPullRequestCommits', () => {
+    it('loads and normalizes commits associated with a pull request', async () => {
+      const requested: string[] = [];
+      const client: BitbucketClient = {
+        getRelative: async (path: string) => {
+          requested.push(path);
+          return { values: [rawCommit] };
+        },
+        getAbsolute: async () => ({ values: [] })
+      };
+
+      const commits = await listPullRequestCommits(workspaceId, repoId, '42', client);
+
+      expect(commits.map((commit) => commit.hash)).toEqual([rawCommit.hash]);
+      expect(requested[0]).toContain('/pullrequests/42/commits?pagelen=50');
+    });
   });
 });

@@ -1,16 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchBoards, fetchSprints } from '../api/access';
 import { UserPicker } from './UserPicker';
-import type { AppUser, JiraBoard, JiraProject, JiraSprint, ProjectMapping, Repository, SprintMode, Workspace } from '../types/models';
+import type { AppUser, JiraProject, ProjectMapping, Repository, Result, Workspace } from '../types/models';
 
-function sprintSummary(mapping: ProjectMapping): string {
-  if (mapping.sprintMode === 'active') {
-    return mapping.sprintName ? `active sprint: ${mapping.sprintName}` : 'active sprint';
-  }
-  if (mapping.sprintMode === 'selected') {
-    return mapping.sprintName || 'selected sprint';
-  }
-  return 'all activity';
+function branchSummary(mapping: ProjectMapping): string {
+  return mapping.targetBranch ? `destination: ${mapping.targetBranch}` : 'all destination branches';
 }
 
 export function MappingPanel({
@@ -18,6 +11,7 @@ export function MappingPanel({
   jiraProjects,
   workspaces,
   onLoadRepositories,
+  onLoadTargetBranches,
   onSave,
   onDelete
 }: {
@@ -25,30 +19,32 @@ export function MappingPanel({
   jiraProjects: JiraProject[];
   workspaces: Workspace[];
   onLoadRepositories: (workspaceId: string) => Promise<Repository[]>;
+  onLoadTargetBranches: (workspaceId: string, repositoryIds: string[]) => Promise<Result<string[]>>;
   onSave: (mapping: Omit<ProjectMapping, 'id'> & { id?: string }) => Promise<boolean>;
   onDelete: (id: string) => Promise<void>;
 }) {
-  const [projectId, setProjectId] = useState(jiraProjects[0]?.id ?? '');
-  const [workspaceId, setWorkspaceId] = useState(workspaces[0]?.id ?? '');
+  const savedMapping = mappings[0];
+  const [projectId, setProjectId] = useState(savedMapping?.projectId ?? jiraProjects[0]?.id ?? '');
+  const [workspaceId, setWorkspaceId] = useState(savedMapping?.workspaceId ?? workspaces[0]?.id ?? '');
   const [repos, setRepos] = useState<Repository[]>([]);
-  const [repositoryIds, setRepositoryIds] = useState<string[]>([]);
-  const pendingRepositoryIds = useRef<string[] | null>(null);
-  const [enabled, setEnabled] = useState(true);
-  const [sprintMode, setSprintMode] = useState<SprintMode>('none');
-  const [boards, setBoards] = useState<JiraBoard[]>([]);
-  const [boardId, setBoardId] = useState('');
-  const [sprints, setSprints] = useState<JiraSprint[]>([]);
-  const [sprintId, setSprintId] = useState('');
-  const [sprintError, setSprintError] = useState<string | null>(null);
-  const [viewers, setViewers] = useState<AppUser[]>([]);
+  const [repositoryIds, setRepositoryIds] = useState<string[]>(
+    savedMapping?.repositories.map((repo) => repo.id) ?? []
+  );
+  const pendingRepositoryIds = useRef<string[] | null>(
+    savedMapping?.repositories.map((repo) => repo.id) ?? null
+  );
+  const [enabled, setEnabled] = useState(savedMapping?.enabled ?? true);
+  const [targetBranch, setTargetBranch] = useState(savedMapping?.targetBranch ?? '');
+  const [targetBranches, setTargetBranches] = useState<string[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [viewers, setViewers] = useState<AppUser[]>(savedMapping?.viewers ?? []);
   const [saving, setSaving] = useState(false);
 
   const project = jiraProjects.find((item) => item.id === projectId);
   const workspace = workspaces.find((item) => item.id === workspaceId);
   const selectedRepositories = repos.filter((item) => repositoryIds.includes(item.id));
-  const board = boards.find((item) => item.id === boardId);
-  const sprint = sprints.find((item) => item.id === sprintId);
-  const sprintOptions = sprintMode === 'active' ? sprints.filter((item) => item.state === 'active') : sprints;
+  const repositoryIdKey = [...repositoryIds].sort().join(',');
 
   useEffect(() => {
     if (!workspaceId) {
@@ -79,63 +75,41 @@ export function MappingPanel({
   }, [workspaceId, onLoadRepositories]);
 
   useEffect(() => {
-    if (!project?.key || sprintMode === 'none') {
-      setBoards([]);
+    if (!workspaceId || repositoryIds.length === 0) {
+      setTargetBranches([]);
+      setBranchError(null);
+      setBranchesLoading(false);
       return;
     }
 
     let cancelled = false;
     void (async () => {
-      const result = await fetchBoards(project.key);
+      setBranchesLoading(true);
+      const result = await onLoadTargetBranches(workspaceId, repositoryIds);
       if (cancelled) {
         return;
       }
       if (!result.ok) {
-        setSprintError(result.message);
-        setBoards([]);
+        setBranchError(result.message);
+        setTargetBranches([]);
+        setBranchesLoading(false);
         return;
       }
-      setSprintError(null);
-      setBoards(result.data);
-      setBoardId((current) => current || result.data[0]?.id || '');
+      setBranchError(null);
+      setTargetBranches(result.data);
+      setBranchesLoading(false);
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [project?.key, sprintMode]);
-
-  useEffect(() => {
-    if (!boardId || sprintMode === 'none') {
-      setSprints([]);
-      return;
-    }
-
-    let cancelled = false;
-    void (async () => {
-      const result = await fetchSprints(boardId);
-      if (cancelled) {
-        return;
-      }
-      if (!result.ok) {
-        setSprintError(result.message);
-        setSprints([]);
-        return;
-      }
-      setSprintError(null);
-      setSprints(result.data);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [boardId, sprintMode]);
+  }, [workspaceId, repositoryIdKey, onLoadTargetBranches]);
 
   return (
     <section className="connect-card" aria-labelledby="mapping-title">
       <h2 id="mapping-title">Project access</h2>
       <p>
-        Map a Jira project to a Bitbucket repository, choose the board and sprint, then pick who can view it.
+        Map a Jira project to Bitbucket repositories, choose a pull request destination branch, then pick who can view it.
         People who are not dashboard admins never see this panel.
       </p>
 
@@ -159,11 +133,12 @@ export function MappingPanel({
               name: repo.name,
               fullName: repo.fullName
             })),
-            sprintMode,
-            boardId: sprintMode === 'none' ? '' : board?.id || boardId,
-            boardName: sprintMode === 'none' ? '' : board?.name || '',
-            sprintId: sprintMode === 'none' ? '' : sprint?.id || sprintId,
-            sprintName: sprintMode === 'none' ? '' : sprint?.name || '',
+            sprintMode: 'none',
+            boardId: '',
+            boardName: '',
+            sprintId: '',
+            sprintName: '',
+            targetBranch,
             viewers
           }).finally(() => setSaving(false));
         }}
@@ -174,8 +149,7 @@ export function MappingPanel({
             value={projectId}
             onChange={(event) => {
               setProjectId(event.target.value);
-              setBoardId('');
-              setSprintId('');
+              setTargetBranch('');
             }}
             aria-label="Map Jira project"
             required
@@ -195,6 +169,7 @@ export function MappingPanel({
             onChange={(event) => {
               pendingRepositoryIds.current = null;
               setRepositoryIds([]);
+              setTargetBranch('');
               setWorkspaceId(event.target.value);
             }}
             aria-label="Map Bitbucket workspace"
@@ -215,13 +190,14 @@ export function MappingPanel({
               <input
                 type="checkbox"
                 checked={repositoryIds.includes(item.id)}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setTargetBranch('');
                   setRepositoryIds((current) =>
                     event.target.checked
                       ? [...current, item.id]
                       : current.filter((id) => id !== item.id)
-                  )
-                }
+                  );
+                }}
               />
               <span>{item.fullName}</span>
             </label>
@@ -233,62 +209,33 @@ export function MappingPanel({
           ) : null}
         </div>
         <label className="filter-field">
-          <span>Client sprint</span>
+          <span>Pull request destination branch</span>
           <select
-            value={sprintMode}
-            onChange={(event) => setSprintMode(event.target.value as SprintMode)}
-            aria-label="Client sprint"
+            value={targetBranch}
+            onChange={(event) => setTargetBranch(event.target.value)}
+            aria-label="Pull request destination branch"
+            disabled={branchesLoading || targetBranches.length === 0}
           >
-            <option value="none">All activity (no sprint filter)</option>
-            <option value="active">Active sprint on a board</option>
-            <option value="selected">A specific sprint</option>
+            <option value="">All destination branches</option>
+            {targetBranch && !targetBranches.includes(targetBranch) ? (
+              <option value={targetBranch}>{targetBranch}</option>
+            ) : null}
+            {targetBranches.map((branch) => (
+              <option key={branch} value={branch}>
+                {branch}
+              </option>
+            ))}
           </select>
         </label>
-        {sprintMode !== 'none' ? (
-          <>
-            <label className="filter-field">
-              <span>Jira board</span>
-              <select
-                value={boardId}
-                onChange={(event) => {
-                  setBoardId(event.target.value);
-                  setSprintId('');
-                }}
-                aria-label="Jira board"
-                required
-              >
-                <option value="">Select board</option>
-                {boards.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="filter-field">
-              <span>{sprintMode === 'active' ? 'Client sprint if two are active' : 'Sprint'}</span>
-              <select
-                value={sprintId}
-                onChange={(event) => setSprintId(event.target.value)}
-                aria-label="Jira sprint"
-                required={sprintMode === 'selected' || sprintOptions.length > 1}
-              >
-                <option value="">{sprintMode === 'active' ? 'Use the only active sprint' : 'Select sprint'}</option>
-                {sprintOptions.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                    {item.state === 'active' ? ' (active)' : item.state === 'future' ? ' (future)' : ' (closed)'}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </>
-        ) : null}
         <p className="muted">
-          When two sprints run in parallel, pick the one the client should see. Pull requests and commits without a
-          matching Jira key in that sprint are hidden.
+          Branch options come from Bitbucket pull request destination branches. Selecting a branch shows its pull
+          requests and the commits included in those pull requests.
         </p>
-        {sprintError ? <p className="connect-error">{sprintError}</p> : null}
+        {branchesLoading ? <p className="muted">Loading destination branches from Bitbucket…</p> : null}
+        {branchError ? <p className="connect-error">{branchError}</p> : null}
+        {!branchesLoading && !branchError && repositoryIds.length > 0 && targetBranches.length === 0 ? (
+          <p className="muted">No pull request destination branches found in the selected repositories.</p>
+        ) : null}
         <UserPicker
           selected={viewers}
           onChange={setViewers}
@@ -321,7 +268,7 @@ export function MappingPanel({
                 </strong>
                 {' → '}
                 {mapping.repositories.map((repo) => repo.name).join(', ')}
-                {` (${sprintSummary(mapping)})`}
+                {` (${branchSummary(mapping)})`}
                 {mapping.viewers.length > 0 ? ` · ${mapping.viewers.length} viewer${mapping.viewers.length === 1 ? '' : 's'}` : ' · all project browsers'}
                 {mapping.enabled ? '' : ' (disabled)'}
               </span>
@@ -335,9 +282,7 @@ export function MappingPanel({
                     setWorkspaceId(mapping.workspaceId);
                     setRepositoryIds(mapping.repositories.map((repo) => repo.id));
                     setEnabled(mapping.enabled);
-                    setSprintMode(mapping.sprintMode || 'none');
-                    setBoardId(mapping.boardId);
-                    setSprintId(mapping.sprintId);
+                    setTargetBranch(mapping.targetBranch ?? '');
                     setViewers(mapping.viewers ?? []);
                   }}
                 >

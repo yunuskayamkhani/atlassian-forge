@@ -22,5 +22,6 @@ export type ProjectMapping = {
   boardName: string;
   sprintId: string;
   sprintName: string;
+  targetBranch?: string;
   viewers: AppUser[];
 };

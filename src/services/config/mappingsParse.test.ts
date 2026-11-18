@@ -22,6 +22,7 @@ const mapping = {
   boardName: '',
   sprintId: '',
   sprintName: '',
+  targetBranch: '',
   viewers: [{ accountId: 'ada', displayName: 'Ada' }]
 };
 
@@ -48,19 +49,7 @@ describe('parseSaveMapping', () => {
     expect(() => parseSaveMapping({ ...mapping, repositories: [] })).toThrow(BitbucketApiError);
   });
 
-  it('rejects an active sprint without a board', () => {
-    expect(() => parseSaveMapping({ ...mapping, sprintMode: 'active' })).toThrow(
-      /Select a Jira board to use the active sprint/
-    );
-  });
-
-  it('rejects a selected sprint without a sprint id', () => {
-    expect(() => parseSaveMapping({ ...mapping, sprintMode: 'selected', boardId: '1' })).toThrow(
-      /Select the sprint the client should see/
-    );
-  });
-
-  it('saves a selected client sprint', () => {
+  it('saves the Bitbucket destination branch and clears legacy Jira sprint filters', () => {
     expect(
       parseSaveMapping({
         ...mapping,
@@ -68,9 +57,15 @@ describe('parseSaveMapping', () => {
         boardId: '12',
         boardName: 'SCRUM board',
         sprintId: '34',
-        sprintName: 'Sprint 12'
+        sprintName: 'Sprint 12',
+        targetBranch: 'Sprint-67/Development_Sprint-67'
       })
-    ).toMatchObject({ sprintMode: 'selected', sprintId: '34', sprintName: 'Sprint 12' });
+    ).toMatchObject({
+      sprintMode: 'none',
+      boardId: '',
+      sprintId: '',
+      targetBranch: 'Sprint-67/Development_Sprint-67'
+    });
   });
 });
 
