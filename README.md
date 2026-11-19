@@ -47,7 +47,7 @@ The Jira project page is `Bitbucket Engineering` (`jira:projectPage`). Admin map
 
 Project access can optionally select a destination branch from the selected Bitbucket repositories. Branch options are loaded from repository branches, so they are available even if a branch has no pull requests yet. When selected, the dashboard shows pull requests targeting that branch and commits associated with those pull requests; no Jira sprint lookup is used for this filter.
 
-The dashboard connects to Bitbucket with an Atlassian API token stored encrypted in Forge. The token must have `read:workspace:bitbucket`, `read:repository:bitbucket`, and `read:pullrequest:bitbucket` scopes. The account that owns the token must also have access to the mapped Bitbucket repositories.
+The dashboard connects to Bitbucket with an Atlassian API token stored encrypted in Forge. The token must have `read:workspace:bitbucket`, `read:repository:bitbucket`, and `read:pullrequest:bitbucket` scopes. To load pipeline health and Bitbucket deployment history, also grant `read:pipeline:bitbucket`. Deployment rows appear only when Bitbucket has recorded deployments; a pipeline run by itself is not a deployment record. The account that owns the token must also have access to the mapped Bitbucket repositories.
 
 ## Push changes to the existing GitHub repository
 

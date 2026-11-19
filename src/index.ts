@@ -7,6 +7,8 @@ import { getWorkspaces } from './resolvers/workspaces';
 import { getRepositories, getRepositoryDetails } from './resolvers/repositories';
 import { getPullRequestTargetBranches, getPullRequests } from './resolvers/pullRequests';
 import { getCommits } from './resolvers/commits';
+import { getPipelines } from './resolvers/pipelines';
+import { getDeployments } from './resolvers/deployments';
 import { getIssueStatuses } from './resolvers/jiraIssues';
 import { getBoards, getSprints } from './resolvers/sprints';
 
@@ -27,6 +29,8 @@ resolver.define('getRepository', (req) => getRepositoryDetails(req.payload));
 resolver.define('getPullRequests', (req) => getPullRequests(req.payload));
 resolver.define('getPullRequestTargetBranches', (req) => getPullRequestTargetBranches(req.payload));
 resolver.define('getCommits', (req) => getCommits(req.payload));
+resolver.define('getPipelines', (req) => getPipelines(req.payload));
+resolver.define('getDeployments', (req) => getDeployments(req.payload));
 resolver.define('getIssueStatuses', (req) => getIssueStatuses(req.payload));
 resolver.define('getBoards', (req) => getBoards(req.payload));
 resolver.define('getSprints', (req) => getSprints(req.payload));

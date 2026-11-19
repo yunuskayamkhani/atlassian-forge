@@ -11,6 +11,7 @@ import { SourceStatus } from './SourceStatus';
 import { EmptyState } from './EmptyState';
 import { AdminPanel } from './AdminPanel';
 import { MappingPanel } from './MappingPanel';
+import { pipelineSummary } from '../util/pipelineStats';
 import type { DataSourceStatus } from '../types/status';
 import type { AppUser, JiraProject, ProjectMapping, Repository, Result, Workspace } from '../types/models';
 
@@ -57,7 +58,7 @@ export function Dashboard({
   onLoadRepositories: (workspaceId: string) => Promise<Repository[]>;
   onLoadTargetBranches: (workspaceId: string, repositoryIds: string[]) => Promise<Result<string[]>>;
 }) {
-  const { pullRequests, commits } = useDashboardData();
+  const { pullRequests, commits, pipelines, deployments } = useDashboardData();
 
   const toSourceState = (
     status: 'idle' | 'needs-repo' | 'loading' | 'loaded' | 'partial' | 'error'
@@ -73,6 +74,9 @@ export function Dashboard({
 
   const prsLoaded = pullRequests.status === 'loaded' || pullRequests.status === 'partial';
   const commitsLoaded = commits.status === 'loaded';
+  const pipelinesLoaded = pipelines.status === 'loaded' || pipelines.status === 'partial';
+  const deploymentsLoaded = deployments.status === 'loaded' || deployments.status === 'partial';
+  const pipelineMetrics = pipelinesLoaded ? pipelineSummary(pipelines.runs) : null;
   const activeMapping = mappings.find(
     (mapping) =>
       mapping.enabled &&
@@ -92,15 +96,19 @@ export function Dashboard({
       : undefined,
     'review-prs': prsLoaded
       ? pullRequests.pullRequests.filter((pr) => pr.state === 'OPEN' && pr.reviewers.length === 0).length
-      : undefined
+      : undefined,
+    'pipeline-success':
+      pipelineMetrics?.successPercent === null ? undefined : pipelineMetrics?.successPercent,
+    'failed-pipelines': pipelinesLoaded ? pipelineMetrics?.failedCount : undefined,
+    deployments: deploymentsLoaded ? deployments.deployments.length : undefined
   };
 
   const sources: DataSourceStatus[] = [
     { id: 'repositories', label: 'Repositories', state: repositoryStatus },
     { id: 'commits', label: 'Commits', state: toSourceState(commits.status) },
     { id: 'pull-requests', label: 'Pull Requests', state: toSourceState(pullRequests.status) },
-    { id: 'pipelines', label: 'Pipelines', state: 'pending' },
-    { id: 'deployments', label: 'Deployments', state: 'pending' }
+    { id: 'pipelines', label: 'Pipelines', state: toSourceState(pipelines.status) },
+    { id: 'deployments', label: 'Deployments', state: toSourceState(deployments.status) }
   ];
 
   return (

@@ -86,6 +86,30 @@ export type Commit = {
   webUrl: string;
 };
 
+export type PipelineRun = {
+  uuid: string;
+  buildNumber: number | null;
+  status: string;
+  branch: string;
+  commitHash: string;
+  trigger: string;
+  createdOn: string;
+  completedOn: string;
+  buildSeconds: number | null;
+  webUrl: string;
+  repositoryName?: string;
+};
+
+export type Deployment = {
+  uuid: string;
+  environment: string;
+  status: string;
+  commitHash: string;
+  createdOn: string;
+  webUrl: string;
+  repositoryName?: string;
+};
+
 export type PullRequestState = 'OPEN' | 'MERGED' | 'DECLINED' | 'SUPERSEDED';
 
 export type PullRequest = {
